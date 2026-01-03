@@ -557,7 +557,7 @@ const styles = {
   addBtn: {
     position: 'fixed',
     bottom: '90px',
-    right: '20px',
+    right: 'max(20px, calc(50% - 280px))', // Contained within 600px max-width
     width: '56px',
     height: '56px',
     borderRadius: '28px',

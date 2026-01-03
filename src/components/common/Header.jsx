@@ -42,6 +42,7 @@ const styles = {
     position: 'sticky',
     top: 0,
     zIndex: 50,
+    width: '100%',
   },
   logo: {
     display: 'flex',

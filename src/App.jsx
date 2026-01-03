@@ -81,11 +81,13 @@ function AppContent() {
 
   return (
     <div style={styles.app}>
-      <Header onSettingsClick={() => setShowSettings(true)} />
-      <main style={styles.main}>
-        {renderPage()}
-      </main>
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <div style={styles.appContainer}>
+        <Header onSettingsClick={() => setShowSettings(true)} />
+        <main style={styles.main}>
+          {renderPage()}
+        </main>
+        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
       
       {/* Settings Modal */}
       {showSettings && (
@@ -119,14 +121,26 @@ function App() {
 
 const styles = {
   app: {
+    width: '100%',
     minHeight: '100vh',
     backgroundColor: '#F5F7FA',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  appContainer: {
+    width: '100%',
+    maxWidth: '600px', // Optimal mobile width on desktop
+    minHeight: '100vh',
+    backgroundColor: '#F5F7FA',
+    position: 'relative',
   },
   main: {
+    width: '100%',
     minHeight: 'calc(100vh - 60px - 70px)', // header + nav
   },
   loadingContainer: {
+    width: '100%',
     minHeight: '100vh',
     backgroundColor: '#F5F7FA',
     display: 'flex',

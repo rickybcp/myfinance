@@ -54,8 +54,10 @@ const styles = {
   nav: {
     position: 'fixed',
     bottom: 0,
-    left: 0,
-    right: 0,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '100%',
+    maxWidth: '600px',
     display: 'flex',
     justifyContent: 'space-around',
     alignItems: 'center',
