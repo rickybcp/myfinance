@@ -265,19 +265,50 @@ export function AppProvider({ children }) {
   };
 
   const fetchAllData = async () => {
-    const [accRes, catRes, subRes, txRes, budRes, recRes] = await Promise.all([
+    console.log('Fetching all data...');
+    
+    const [accRes, catRes, subRes, budRes, recRes] = await Promise.all([
       supabase.from('accounts').select('*').order('sort_order'),
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('subcategories').select('*').order('sort_order'),
-      supabase.from('transactions').select('*').order('date', { ascending: false }).limit(10000),
       supabase.from('budgets').select('*, budget_categories(*), budget_subcategories(*)'),
       supabase.from('recurring_templates').select('*').eq('is_active', true),
     ]);
 
+    // Fetch ALL transactions with pagination (Supabase max 1000 per request)
+    let allTransactions = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allTransactions = [...allTransactions, ...data];
+        console.log(`Fetched page ${page + 1}: ${data.length} transactions (total: ${allTransactions.length})`);
+        page++;
+        hasMore = data.length === pageSize; // If we got full page, there might be more
+      } else {
+        hasMore = false;
+      }
+    }
+
+    console.log('Total transactions fetched:', allTransactions.length);
+    
     setAccounts(accRes.data || []);
     setCategories(catRes.data || []);
     setSubcategories(subRes.data || []);
-    setTransactions(txRes.data || []);
+    setTransactions(allTransactions);
     setBudgets(budRes.data || []);
     setRecurringTemplates(recRes.data || []);
   };
