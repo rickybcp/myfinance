@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage';
 import TransactionsPage from './pages/TransactionsPage';
 import BudgetsPage from './pages/BudgetsPage';
 import InsightsPage from './pages/InsightsPage';
+import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
 // ============================================================================
@@ -69,6 +70,8 @@ function AppContent() {
         return <BudgetsPage />;
       case 'insights':
         return <InsightsPage />;
+      case 'settings':
+        return <SettingsPage />;
       default:
         return <HomePage />;
     }

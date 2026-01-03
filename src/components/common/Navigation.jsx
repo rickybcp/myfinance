@@ -12,6 +12,7 @@ export default function Navigation({ activeTab, onTabChange }) {
     { id: 'transactions', icon: '💳', labelFr: 'Transactions', labelEn: 'Transactions' },
     { id: 'budgets', icon: '🐷', labelFr: 'Budgets', labelEn: 'Budgets' },
     { id: 'insights', icon: '📊', labelFr: 'Analyses', labelEn: 'Insights' },
+    { id: 'settings', icon: '⚙️', labelFr: 'Paramètres', labelEn: 'Settings' },
   ];
 
   return (
@@ -68,7 +69,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '4px',
-    padding: '8px 16px',
+    padding: '8px 12px',
     border: 'none',
     background: 'none',
     cursor: 'pointer',

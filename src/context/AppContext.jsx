@@ -325,6 +325,134 @@ export function AppProvider({ children }) {
   };
 
   // ============================================================================
+  // ACCOUNT CRUD
+  // ============================================================================
+  const addAccount = async (account) => {
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert({ ...account, user_id: user.id })
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setAccounts(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
+    }
+    return { data, error };
+  };
+
+  const updateAccount = async (id, updates) => {
+    const { data, error } = await supabase
+      .from('accounts')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setAccounts(prev => prev.map(a => a.id === id ? data : a).sort((a, b) => a.sort_order - b.sort_order));
+    }
+    return { data, error };
+  };
+
+  const deleteAccount = async (id) => {
+    const { error } = await supabase
+      .from('accounts')
+      .delete()
+      .eq('id', id);
+    
+    if (!error) {
+      setAccounts(prev => prev.filter(a => a.id !== id));
+    }
+    return { error };
+  };
+
+  // ============================================================================
+  // CATEGORY CRUD
+  // ============================================================================
+  const addCategory = async (category) => {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ ...category, user_id: user.id })
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setCategories(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
+    }
+    return { data, error };
+  };
+
+  const updateCategory = async (id, updates) => {
+    const { data, error } = await supabase
+      .from('categories')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setCategories(prev => prev.map(c => c.id === id ? data : c).sort((a, b) => a.sort_order - b.sort_order));
+    }
+    return { data, error };
+  };
+
+  const deleteCategory = async (id) => {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+    
+    if (!error) {
+      setCategories(prev => prev.filter(c => c.id !== id));
+      // Also remove subcategories of this category from local state
+      setSubcategories(prev => prev.filter(s => s.category_id !== id));
+    }
+    return { error };
+  };
+
+  // ============================================================================
+  // SUBCATEGORY CRUD
+  // ============================================================================
+  const addSubcategory = async (subcategory) => {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .insert({ ...subcategory, user_id: user.id })
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setSubcategories(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
+    }
+    return { data, error };
+  };
+
+  const updateSubcategory = async (id, updates) => {
+    const { data, error } = await supabase
+      .from('subcategories')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setSubcategories(prev => prev.map(s => s.id === id ? data : s).sort((a, b) => a.sort_order - b.sort_order));
+    }
+    return { data, error };
+  };
+
+  const deleteSubcategory = async (id) => {
+    const { error } = await supabase
+      .from('subcategories')
+      .delete()
+      .eq('id', id);
+    
+    if (!error) {
+      setSubcategories(prev => prev.filter(s => s.id !== id));
+    }
+    return { error };
+  };
+
+  // ============================================================================
   // BUDGET CRUD
   // ============================================================================
   const addBudget = async (budget, categoryIds = [], subcategoryIds = []) => {
@@ -448,10 +576,27 @@ export function AppProvider({ children }) {
     dataLoading,
     setupLoading,
     
-    // CRUD
+    // Transaction CRUD
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    
+    // Account CRUD
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    
+    // Category CRUD
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    
+    // Subcategory CRUD
+    addSubcategory,
+    updateSubcategory,
+    deleteSubcategory,
+    
+    // Budget CRUD
     addBudget,
     updateBudget,
     deleteBudget,
