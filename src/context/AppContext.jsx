@@ -269,7 +269,7 @@ export function AppProvider({ children }) {
       supabase.from('accounts').select('*').order('sort_order'),
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('subcategories').select('*').order('sort_order'),
-      supabase.from('transactions').select('*').order('date', { ascending: false }),
+      supabase.from('transactions').select('*').order('date', { ascending: false }).limit(10000),
       supabase.from('budgets').select('*, budget_categories(*), budget_subcategories(*)'),
       supabase.from('recurring_templates').select('*').eq('is_active', true),
     ]);
