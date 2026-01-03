@@ -453,6 +453,48 @@ export function AppProvider({ children }) {
   };
 
   // ============================================================================
+  // RECURRING TEMPLATE CRUD
+  // ============================================================================
+  const addRecurringTemplate = async (template) => {
+    const { data, error } = await supabase
+      .from('recurring_templates')
+      .insert({ ...template, user_id: user.id })
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setRecurringTemplates(prev => [...prev, data]);
+    }
+    return { data, error };
+  };
+
+  const updateRecurringTemplate = async (id, updates) => {
+    const { data, error } = await supabase
+      .from('recurring_templates')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (!error && data) {
+      setRecurringTemplates(prev => prev.map(t => t.id === id ? data : t));
+    }
+    return { data, error };
+  };
+
+  const deleteRecurringTemplate = async (id) => {
+    const { error } = await supabase
+      .from('recurring_templates')
+      .delete()
+      .eq('id', id);
+    
+    if (!error) {
+      setRecurringTemplates(prev => prev.filter(t => t.id !== id));
+    }
+    return { error };
+  };
+
+  // ============================================================================
   // BUDGET CRUD
   // ============================================================================
   const addBudget = async (budget, categoryIds = [], subcategoryIds = []) => {
@@ -595,6 +637,11 @@ export function AppProvider({ children }) {
     addSubcategory,
     updateSubcategory,
     deleteSubcategory,
+    
+    // Recurring Template CRUD
+    addRecurringTemplate,
+    updateRecurringTemplate,
+    deleteRecurringTemplate,
     
     // Budget CRUD
     addBudget,

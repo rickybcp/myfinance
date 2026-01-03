@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 // HEADER - Top bar with logo, language toggle, sign out
 // ============================================================================
 
-export default function Header() {
+export default function Header({ onSettingsClick }) {
   const { user, language, toggleLanguage, signOut, t } = useApp();
 
   return (
@@ -17,6 +17,10 @@ export default function Header() {
       <div style={styles.actions}>
         <button onClick={toggleLanguage} style={styles.langBtn}>
           {language === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}
+        </button>
+        
+        <button onClick={onSettingsClick} style={styles.actionBtn} title={t('Paramètres', 'Settings')}>
+          ⚙️
         </button>
         
         <button onClick={signOut} style={styles.signOutBtn} title={t('Se déconnecter', 'Sign out')}>
@@ -64,6 +68,18 @@ const styles = {
     background: 'white',
     cursor: 'pointer',
     fontSize: '13px',
+  },
+  actionBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '36px',
+    height: '36px',
+    border: '1px solid #E1E8ED',
+    borderRadius: '8px',
+    background: 'white',
+    fontSize: '18px',
+    cursor: 'pointer',
   },
   signOutBtn: {
     display: 'flex',

@@ -10,9 +10,9 @@ export default function Navigation({ activeTab, onTabChange }) {
   const tabs = [
     { id: 'home', icon: '🏠', labelFr: 'Accueil', labelEn: 'Home' },
     { id: 'transactions', icon: '💳', labelFr: 'Transactions', labelEn: 'Transactions' },
+    { id: 'recurring', icon: '🔄', labelFr: 'Récurrences', labelEn: 'Recurring' },
     { id: 'budgets', icon: '🐷', labelFr: 'Budgets', labelEn: 'Budgets' },
     { id: 'insights', icon: '📊', labelFr: 'Analyses', labelEn: 'Insights' },
-    { id: 'settings', icon: '⚙️', labelFr: 'Paramètres', labelEn: 'Settings' },
   ];
 
   return (

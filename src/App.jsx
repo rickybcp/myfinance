@@ -8,6 +8,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import BudgetsPage from './pages/BudgetsPage';
 import InsightsPage from './pages/InsightsPage';
 import SettingsPage from './pages/SettingsPage';
+import RecurringPage from './pages/RecurringPage';
 import './App.css';
 
 // ============================================================================
@@ -17,6 +18,7 @@ import './App.css';
 function AppContent() {
   const { user, authLoading, setupLoading, dataLoading, t } = useApp();
   const [activeTab, setActiveTab] = useState('home');
+  const [showSettings, setShowSettings] = useState(false);
 
   // Loading state
   if (authLoading) {
@@ -66,12 +68,12 @@ function AppContent() {
         return <HomePage />;
       case 'transactions':
         return <TransactionsPage />;
+      case 'recurring':
+        return <RecurringPage />;
       case 'budgets':
         return <BudgetsPage />;
       case 'insights':
         return <InsightsPage />;
-      case 'settings':
-        return <SettingsPage />;
       default:
         return <HomePage />;
     }
@@ -79,11 +81,26 @@ function AppContent() {
 
   return (
     <div style={styles.app}>
-      <Header />
+      <Header onSettingsClick={() => setShowSettings(true)} />
       <main style={styles.main}>
         {renderPage()}
       </main>
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      
+      {/* Settings Modal */}
+      {showSettings && (
+        <div style={styles.settingsOverlay}>
+          <div style={styles.settingsModal}>
+            <button 
+              onClick={() => setShowSettings(false)} 
+              style={styles.settingsClose}
+            >
+              ✕ {t('Fermer', 'Close')}
+            </button>
+            <SettingsPage />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -133,6 +150,34 @@ const styles = {
     color: '#636E72',
     fontSize: '16px',
     margin: 0,
+  },
+  settingsOverlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 100,
+    overflowY: 'auto',
+  },
+  settingsModal: {
+    minHeight: '100%',
+    backgroundColor: '#F5F7FA',
+  },
+  settingsClose: {
+    position: 'sticky',
+    top: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    padding: '16px',
+    backgroundColor: 'white',
+    border: 'none',
+    borderBottom: '1px solid #E1E8ED',
+    fontSize: '15px',
+    fontWeight: '500',
+    color: '#636E72',
+    cursor: 'pointer',
+    zIndex: 10,
   },
 };
 
