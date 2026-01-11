@@ -8,8 +8,9 @@ import { useApp } from '../../context/AppContext';
 const FREQUENCY_OPTIONS = [
   { value: 'monthly', labelFr: 'Mensuel', labelEn: 'Monthly' },
   { value: 'weekly', labelFr: 'Hebdomadaire', labelEn: 'Weekly' },
-  { value: 'yearly', labelFr: 'Annuel', labelEn: 'Yearly' },
   { value: 'biweekly', labelFr: 'Bimensuel', labelEn: 'Bi-weekly' },
+  { value: 'trimestrial', labelFr: 'Trimestriel', labelEn: 'Quarterly' },
+  { value: 'yearly', labelFr: 'Annuel', labelEn: 'Yearly' },
 ];
 
 export default function RecurringForm({ template, onClose, onSave }) {
@@ -100,7 +101,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
       description: description.trim(),
       amount: parseFloat(amount),
       frequency,
-      day_of_month: frequency === 'monthly' || frequency === 'yearly' ? parseInt(dayOfMonth) : null,
+      day_of_month: frequency === 'monthly' || frequency === 'trimestrial' || frequency === 'yearly' ? parseInt(dayOfMonth) : null,
       day_of_week: frequency === 'weekly' || frequency === 'biweekly' ? parseInt(dayOfWeek) : null,
       subcategory_id: selectedSubcategory,
       account_id: selectedAccount || null,
@@ -188,8 +189,8 @@ export default function RecurringForm({ template, onClose, onSave }) {
             </select>
           </div>
 
-          {/* Day of month (for monthly/yearly) */}
-          {(frequency === 'monthly' || frequency === 'yearly') && (
+          {/* Day of month (for monthly/trimestrial/yearly) */}
+          {(frequency === 'monthly' || frequency === 'trimestrial' || frequency === 'yearly') && (
             <div style={styles.field}>
               <label style={styles.label}>{t('Jour du mois', 'Day of month')}</label>
               <select

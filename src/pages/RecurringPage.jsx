@@ -44,6 +44,15 @@ export default function RecurringPage() {
           ? new Date(currentYear, currentMonth + 1, 0).getDate() // Last day
           : Math.min(template.day_of_month, new Date(currentYear, currentMonth + 1, 0).getDate());
         expectedDate = new Date(currentYear, currentMonth, day);
+      } else if (template.frequency === 'trimestrial') {
+        // For trimestrial, check if this month is a quarter month from start
+        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
+        const monthsDiff = (currentMonth - startMonth + 12) % 12;
+        if (monthsDiff % 3 !== 0) return; // Not a trimestrial month
+        const day = template.day_of_month === 99
+          ? new Date(currentYear, currentMonth + 1, 0).getDate()
+          : Math.min(template.day_of_month || 1, new Date(currentYear, currentMonth + 1, 0).getDate());
+        expectedDate = new Date(currentYear, currentMonth, day);
       } else if (template.frequency === 'yearly') {
         // For yearly, check if this month matches start date month
         const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
@@ -117,12 +126,13 @@ export default function RecurringPage() {
       weekly: t('Hebdomadaire', 'Weekly'),
       yearly: t('Annuel', 'Yearly'),
       biweekly: t('Bimensuel', 'Bi-weekly'),
+      trimestrial: t('Trimestriel', 'Quarterly'),
     };
     return labels[freq] || freq;
   };
 
   const getDayLabel = (template) => {
-    if (template.frequency === 'monthly' || template.frequency === 'yearly') {
+    if (template.frequency === 'monthly' || template.frequency === 'trimestrial' || template.frequency === 'yearly') {
       if (template.day_of_month === 99) return t('Dernier jour', 'Last day');
       return `${t('Le', 'Day')} ${template.day_of_month}`;
     }
