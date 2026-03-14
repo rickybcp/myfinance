@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 
 // ============================================================================
@@ -7,11 +7,24 @@ import { useApp } from '../../context/AppContext';
 
 export default function TransactionForm({ transaction, onClose, onSave }) {
   const { 
-    t, language, accounts, categories, subcategories,
+    t, language, accounts, categories, subcategories, transactions,
     addTransaction, updateTransaction 
   } = useApp();
 
   const isEditing = !!transaction;
+
+  // Get unique beneficiaries from existing transactions for autocomplete
+  const uniqueBeneficiaries = useMemo(() => {
+    const beneficiaries = new Set();
+    transactions.forEach(tx => {
+      if (tx.description && tx.description.trim()) {
+        beneficiaries.add(tx.description.trim());
+      }
+    });
+    return Array.from(beneficiaries).sort((a, b) => 
+      a.toLowerCase().localeCompare(b.toLowerCase())
+    );
+  }, [transactions]);
 
   // Form state
   const [description, setDescription] = useState('');
@@ -128,16 +141,23 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Description */}
+          {/* Bénéficiaire (was Description) */}
           <div style={styles.field}>
-            <label style={styles.label}>{t('Description', 'Description')} *</label>
+            <label style={styles.label}>{t('Bénéficiaire', 'Beneficiary')} *</label>
             <input
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder={t('Ex: Colruyt, Netflix...', 'Ex: Groceries, Netflix...')}
               style={styles.input}
+              list="beneficiaries-list"
+              autoComplete="off"
             />
+            <datalist id="beneficiaries-list">
+              {uniqueBeneficiaries.map((name, idx) => (
+                <option key={idx} value={name} />
+              ))}
+            </datalist>
           </div>
 
           {/* Amount & Date row */}
@@ -218,13 +238,13 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
             </div>
           )}
 
-          {/* Notes */}
+          {/* Description (was Notes) */}
           <div style={styles.field}>
-            <label style={styles.label}>{t('Notes', 'Notes')}</label>
+            <label style={styles.label}>{t('Description', 'Description')}</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder={t('Notes optionnelles...', 'Optional notes...')}
+              placeholder={t('Description optionnelle...', 'Optional description...')}
               style={styles.textarea}
               rows={2}
             />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 
 // ============================================================================
@@ -15,11 +15,24 @@ const FREQUENCY_OPTIONS = [
 
 export default function RecurringForm({ template, onClose, onSave }) {
   const { 
-    t, language, accounts, categories, subcategories,
+    t, language, accounts, categories, subcategories, transactions,
     addRecurringTemplate, updateRecurringTemplate
   } = useApp();
 
   const isEditing = !!template;
+
+  // Get unique beneficiaries from existing transactions for autocomplete
+  const uniqueBeneficiaries = useMemo(() => {
+    const beneficiaries = new Set();
+    transactions.forEach(tx => {
+      if (tx.description && tx.description.trim()) {
+        beneficiaries.add(tx.description.trim());
+      }
+    });
+    return Array.from(beneficiaries).sort((a, b) => 
+      a.toLowerCase().localeCompare(b.toLowerCase())
+    );
+  }, [transactions]);
 
   // Form state
   const [description, setDescription] = useState('');
@@ -147,16 +160,23 @@ export default function RecurringForm({ template, onClose, onSave }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Description */}
+          {/* Bénéficiaire (was Description) */}
           <div style={styles.field}>
-            <label style={styles.label}>{t('Description', 'Description')} *</label>
+            <label style={styles.label}>{t('Bénéficiaire', 'Beneficiary')} *</label>
             <input
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder={t('Ex: Loyer, Netflix, Électricité...', 'Ex: Rent, Netflix, Electricity...')}
               style={styles.input}
+              list="recurring-beneficiaries-list"
+              autoComplete="off"
             />
+            <datalist id="recurring-beneficiaries-list">
+              {uniqueBeneficiaries.map((name, idx) => (
+                <option key={idx} value={name} />
+              ))}
+            </datalist>
           </div>
 
           {/* Amount */}
@@ -293,14 +313,14 @@ export default function RecurringForm({ template, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Description (was Notes) */}
           <div style={styles.field}>
-            <label style={styles.label}>{t('Notes', 'Notes')}</label>
+            <label style={styles.label}>{t('Description', 'Description')}</label>
             <input
               type="text"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder={t('Notes optionnelles...', 'Optional notes...')}
+              placeholder={t('Description optionnelle...', 'Optional description...')}
               style={styles.input}
             />
           </div>

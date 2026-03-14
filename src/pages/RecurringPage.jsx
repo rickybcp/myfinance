@@ -9,7 +9,7 @@ import RecurringForm from '../components/recurring/RecurringForm';
 export default function RecurringPage() {
   const { 
     t, language, recurringTemplates, transactions, categories, subcategories, accounts,
-    formatAmount, formatDate, deleteRecurringTemplate, addTransaction,
+    formatAmount, formatDate, deleteRecurringTemplate, addTransaction, updateRecurringTemplate,
     getSubcategory, getCategoryForSubcategory, getAccount
   } = useApp();
 
@@ -17,74 +17,103 @@ export default function RecurringPage() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
+  const [decliningId, setDecliningId] = useState(null);
 
   // ============================================================================
-  // CALCULATE PENDING TRANSACTIONS
+  // CALCULATE PENDING TRANSACTIONS (ALL MONTHS)
   // ============================================================================
   
   const pendingTransactions = useMemo(() => {
     const pending = [];
     const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
 
     recurringTemplates.forEach(template => {
       if (!template.is_active) return;
 
-      // Check if start date has passed
-      if (template.start_date && new Date(template.start_date) > today) return;
+      // Start from start_date or last_skipped_date (whichever is later)
+      let startFrom = template.start_date ? new Date(template.start_date) : new Date(2020, 0, 1);
+      if (template.last_skipped_date) {
+        const skippedDate = new Date(template.last_skipped_date);
+        if (skippedDate > startFrom) {
+          // Start from month AFTER the skipped date
+          startFrom = new Date(skippedDate.getFullYear(), skippedDate.getMonth() + 1, 1);
+        }
+      }
 
       // Check if end date has passed
       if (template.end_date && new Date(template.end_date) < today) return;
 
-      // Calculate expected date for this month
-      let expectedDate;
-      if (template.frequency === 'monthly') {
-        const day = template.day_of_month === 99 
-          ? new Date(currentYear, currentMonth + 1, 0).getDate() // Last day
-          : Math.min(template.day_of_month, new Date(currentYear, currentMonth + 1, 0).getDate());
-        expectedDate = new Date(currentYear, currentMonth, day);
-      } else if (template.frequency === 'trimestrial') {
-        // For trimestrial, check if this month is a quarter month from start
-        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
-        const monthsDiff = (currentMonth - startMonth + 12) % 12;
-        if (monthsDiff % 3 !== 0) return; // Not a trimestrial month
-        const day = template.day_of_month === 99
-          ? new Date(currentYear, currentMonth + 1, 0).getDate()
-          : Math.min(template.day_of_month || 1, new Date(currentYear, currentMonth + 1, 0).getDate());
-        expectedDate = new Date(currentYear, currentMonth, day);
-      } else if (template.frequency === 'yearly') {
-        // For yearly, check if this month matches start date month
-        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
-        if (currentMonth !== startMonth) return;
-        const day = Math.min(template.day_of_month || 1, new Date(currentYear, currentMonth + 1, 0).getDate());
-        expectedDate = new Date(currentYear, currentMonth, day);
-      } else {
-        // Weekly/biweekly - more complex, skip for now
-        return;
-      }
+      // Generate all expected occurrences from startFrom to today
+      const occurrences = generateOccurrences(template, startFrom, today);
 
-      // Check if transaction already exists for this template this month
-      const exists = transactions.some(tx => {
-        const txDate = new Date(tx.date);
-        return (
-          tx.description === template.description &&
-          tx.amount === template.amount &&
-          txDate.getMonth() === currentMonth &&
-          txDate.getFullYear() === currentYear
-        );
-      });
-
-      if (!exists && expectedDate <= today) {
-        pending.push({
-          ...template,
-          expectedDate: expectedDate.toISOString().split('T')[0],
+      // Filter out occurrences that have matching transactions
+      occurrences.forEach(expectedDate => {
+        const exists = transactions.some(tx => {
+          const txDate = new Date(tx.date);
+          return (
+            tx.description === template.description &&
+            Math.abs(tx.amount - template.amount) < 0.01 &&
+            txDate.getMonth() === expectedDate.getMonth() &&
+            txDate.getFullYear() === expectedDate.getFullYear()
+          );
         });
-      }
+
+        if (!exists) {
+          pending.push({
+            ...template,
+            expectedDate: expectedDate.toISOString().split('T')[0],
+            _occurrenceKey: `${template.id}-${expectedDate.toISOString().split('T')[0]}`,
+          });
+        }
+      });
     });
 
-    return pending;
+    // Sort by date (oldest first)
+    return pending.sort((a, b) => new Date(a.expectedDate) - new Date(b.expectedDate));
   }, [recurringTemplates, transactions]);
+
+  // Generate all occurrence dates for a template between startFrom and endDate
+  const generateOccurrences = (template, startFrom, endDate) => {
+    const occurrences = [];
+    let current = new Date(startFrom.getFullYear(), startFrom.getMonth(), 1);
+
+    while (current <= endDate) {
+      const year = current.getFullYear();
+      const month = current.getMonth();
+      let expectedDate = null;
+
+      if (template.frequency === 'monthly') {
+        const day = template.day_of_month === 99
+          ? new Date(year, month + 1, 0).getDate()
+          : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
+        expectedDate = new Date(year, month, day);
+      } else if (template.frequency === 'trimestrial') {
+        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
+        const monthsDiff = (month - startMonth + 12) % 12;
+        if (monthsDiff % 3 === 0) {
+          const day = template.day_of_month === 99
+            ? new Date(year, month + 1, 0).getDate()
+            : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
+          expectedDate = new Date(year, month, day);
+        }
+      } else if (template.frequency === 'yearly') {
+        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
+        if (month === startMonth) {
+          const day = Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
+          expectedDate = new Date(year, month, day);
+        }
+      }
+
+      if (expectedDate && expectedDate >= startFrom && expectedDate <= endDate) {
+        occurrences.push(expectedDate);
+      }
+
+      // Move to next month
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    return occurrences;
+  };
 
   // ============================================================================
   // HANDLERS
@@ -106,7 +135,7 @@ export default function RecurringPage() {
   };
 
   const handleGenerateTransaction = async (template) => {
-    setGeneratingId(template.id);
+    setGeneratingId(template._occurrenceKey || template.id);
     
     await addTransaction({
       description: template.description,
@@ -118,6 +147,17 @@ export default function RecurringPage() {
     });
 
     setGeneratingId(null);
+  };
+
+  const handleDecline = async (template) => {
+    setDecliningId(template._occurrenceKey || template.id);
+    
+    // Update last_skipped_date to skip this and all previous occurrences
+    await updateRecurringTemplate(template.id, {
+      last_skipped_date: template.expectedDate,
+    });
+
+    setDecliningId(null);
   };
 
   const getFrequencyLabel = (freq) => {
@@ -165,9 +205,10 @@ export default function RecurringPage() {
             {pendingTransactions.map(template => {
               const category = getCategoryForSubcategory(template.subcategory_id);
               const subcategory = getSubcategory(template.subcategory_id);
+              const occKey = template._occurrenceKey;
               
               return (
-                <div key={template.id} style={styles.pendingCard}>
+                <div key={occKey} style={styles.pendingCard}>
                   <div style={styles.pendingLeft}>
                     <div style={{
                       ...styles.pendingDot,
@@ -185,11 +226,20 @@ export default function RecurringPage() {
                   <div style={styles.pendingRight}>
                     <span style={styles.pendingAmount}>{formatAmount(template.amount)}</span>
                     <button
+                      onClick={() => handleDecline(template)}
+                      style={styles.declineBtn}
+                      disabled={decliningId === occKey}
+                      title={t('Ignorer', 'Skip')}
+                    >
+                      {decliningId === occKey ? '...' : '✕'}
+                    </button>
+                    <button
                       onClick={() => handleGenerateTransaction(template)}
                       style={styles.generateBtn}
-                      disabled={generatingId === template.id}
+                      disabled={generatingId === occKey}
+                      title={t('Accepter', 'Accept')}
                     >
-                      {generatingId === template.id ? '...' : '✓'}
+                      {generatingId === occKey ? '...' : '✓'}
                     </button>
                   </div>
                 </div>
@@ -442,6 +492,19 @@ const styles = {
     backgroundColor: '#00B894',
     color: 'white',
     fontSize: '16px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  declineBtn: {
+    width: '36px',
+    height: '36px',
+    border: '1px solid #E1E8ED',
+    borderRadius: '18px',
+    backgroundColor: 'white',
+    color: '#636E72',
+    fontSize: '14px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
