@@ -130,9 +130,10 @@ export default function RecurringForm({ template, onClose, onSave }) {
     setSaving(true);
 
     // Construct start_date for yearly/trimestrial based on selected month
+    // Use PREVIOUS year so current year's occurrence will be detected
     let computedStartDate = startDate || null;
     if (frequency === 'yearly' || frequency === 'trimestrial') {
-      const year = new Date().getFullYear();
+      const year = new Date().getFullYear() - 1; // Previous year
       const month = parseInt(selectedMonth);
       const day = Math.min(parseInt(dayOfMonth) || 1, new Date(year, month + 1, 0).getDate());
       computedStartDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;

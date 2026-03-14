@@ -72,6 +72,8 @@ export default function RecurringPage() {
   const pendingTransactions = useMemo(() => {
     const pending = [];
     const today = new Date();
+    // Include occurrences up to end of current month (not just today)
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     recurringTemplates.forEach(template => {
       if (!template.is_active) return;
@@ -89,8 +91,8 @@ export default function RecurringPage() {
       // Check if end date has passed
       if (template.end_date && new Date(template.end_date) < today) return;
 
-      // Generate all expected occurrences from startFrom to today
-      const occurrences = generateOccurrences(template, startFrom, today);
+      // Generate all expected occurrences from startFrom to end of current month
+      const occurrences = generateOccurrences(template, startFrom, endOfMonth);
 
       // Filter out occurrences that have matching transactions
       occurrences.forEach(expectedDate => {
