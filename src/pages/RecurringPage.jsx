@@ -20,6 +20,52 @@ export default function RecurringPage() {
   const [decliningId, setDecliningId] = useState(null);
 
   // ============================================================================
+  // HELPER: Generate occurrence dates for a template
+  // ============================================================================
+  
+  const generateOccurrences = (template, startFrom, endDate) => {
+    const occurrences = [];
+    let current = new Date(startFrom.getFullYear(), startFrom.getMonth(), 1);
+
+    while (current <= endDate) {
+      const year = current.getFullYear();
+      const month = current.getMonth();
+      let expectedDate = null;
+
+      if (template.frequency === 'monthly') {
+        const day = template.day_of_month === 99
+          ? new Date(year, month + 1, 0).getDate()
+          : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
+        expectedDate = new Date(year, month, day);
+      } else if (template.frequency === 'trimestrial') {
+        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
+        const monthsDiff = (month - startMonth + 12) % 12;
+        if (monthsDiff % 3 === 0) {
+          const day = template.day_of_month === 99
+            ? new Date(year, month + 1, 0).getDate()
+            : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
+          expectedDate = new Date(year, month, day);
+        }
+      } else if (template.frequency === 'yearly') {
+        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
+        if (month === startMonth) {
+          const day = Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
+          expectedDate = new Date(year, month, day);
+        }
+      }
+
+      if (expectedDate && expectedDate >= startFrom && expectedDate <= endDate) {
+        occurrences.push(expectedDate);
+      }
+
+      // Move to next month
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    return occurrences;
+  };
+
+  // ============================================================================
   // CALCULATE PENDING TRANSACTIONS (ALL MONTHS)
   // ============================================================================
   
@@ -71,49 +117,6 @@ export default function RecurringPage() {
     // Sort by date (oldest first)
     return pending.sort((a, b) => new Date(a.expectedDate) - new Date(b.expectedDate));
   }, [recurringTemplates, transactions]);
-
-  // Generate all occurrence dates for a template between startFrom and endDate
-  const generateOccurrences = (template, startFrom, endDate) => {
-    const occurrences = [];
-    let current = new Date(startFrom.getFullYear(), startFrom.getMonth(), 1);
-
-    while (current <= endDate) {
-      const year = current.getFullYear();
-      const month = current.getMonth();
-      let expectedDate = null;
-
-      if (template.frequency === 'monthly') {
-        const day = template.day_of_month === 99
-          ? new Date(year, month + 1, 0).getDate()
-          : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
-        expectedDate = new Date(year, month, day);
-      } else if (template.frequency === 'trimestrial') {
-        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
-        const monthsDiff = (month - startMonth + 12) % 12;
-        if (monthsDiff % 3 === 0) {
-          const day = template.day_of_month === 99
-            ? new Date(year, month + 1, 0).getDate()
-            : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
-          expectedDate = new Date(year, month, day);
-        }
-      } else if (template.frequency === 'yearly') {
-        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
-        if (month === startMonth) {
-          const day = Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
-          expectedDate = new Date(year, month, day);
-        }
-      }
-
-      if (expectedDate && expectedDate >= startFrom && expectedDate <= endDate) {
-        occurrences.push(expectedDate);
-      }
-
-      // Move to next month
-      current.setMonth(current.getMonth() + 1);
-    }
-
-    return occurrences;
-  };
 
   // ============================================================================
   // HANDLERS
