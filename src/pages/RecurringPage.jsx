@@ -174,11 +174,31 @@ export default function RecurringPage() {
     return labels[freq] || freq;
   };
 
+  const monthNames = language === 'fr'
+    ? ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
   const getDayLabel = (template) => {
-    if (template.frequency === 'monthly' || template.frequency === 'trimestrial' || template.frequency === 'yearly') {
-      if (template.day_of_month === 99) return t('Dernier jour', 'Last day');
-      return `${t('Le', 'Day')} ${template.day_of_month}`;
+    const dayPart = template.day_of_month === 99 
+      ? t('Dernier jour', 'Last day')
+      : `${t('Le', 'Day')} ${template.day_of_month}`;
+
+    if (template.frequency === 'yearly' && template.start_date) {
+      const month = new Date(template.start_date).getMonth();
+      return `${dayPart} ${monthNames[month]}`;
     }
+    
+    if (template.frequency === 'trimestrial' && template.start_date) {
+      const startMonth = new Date(template.start_date).getMonth();
+      const months = [0, 3, 6, 9].map(offset => monthNames[(startMonth + offset) % 12]);
+      return `${dayPart} (${months.join(', ')})`;
+    }
+
+    if (template.frequency === 'monthly') {
+      return dayPart;
+    }
+
+    // Weekly/biweekly
     const weekDays = language === 'fr' 
       ? ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
       : ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

@@ -34,12 +34,18 @@ export default function RecurringForm({ template, onClose, onSave }) {
     );
   }, [transactions]);
 
+  // Month names for selectors
+  const monthNames = language === 'fr'
+    ? ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+    : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
   // Form state
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('monthly');
   const [dayOfMonth, setDayOfMonth] = useState('1');
   const [dayOfWeek, setDayOfWeek] = useState('1'); // 1 = Monday
+  const [selectedMonth, setSelectedMonth] = useState('0'); // 0 = January
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('');
@@ -54,6 +60,12 @@ export default function RecurringForm({ template, onClose, onSave }) {
   const filteredSubcategories = selectedCategory
     ? subcategories.filter(s => s.category_id === selectedCategory)
     : subcategories;
+
+  // Calculate trimestrial months based on selected starting month
+  const trimestrialMonths = useMemo(() => {
+    const startMonth = parseInt(selectedMonth);
+    return [0, 3, 6, 9].map(offset => monthNames[(startMonth + offset) % 12]);
+  }, [selectedMonth, monthNames]);
 
   // Initialize form when editing
   useEffect(() => {
@@ -70,6 +82,12 @@ export default function RecurringForm({ template, onClose, onSave }) {
       setNotes(template.notes || '');
       setIsActive(template.is_active !== false);
 
+      // Extract month from start_date for yearly/trimestrial
+      if (template.start_date) {
+        const month = new Date(template.start_date).getMonth();
+        setSelectedMonth(String(month));
+      }
+
       // Set category from subcategory
       if (template.subcategory_id) {
         const sub = subcategories.find(s => s.id === template.subcategory_id);
@@ -78,6 +96,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
     } else {
       // Defaults for new template
       const today = new Date().toISOString().split('T')[0];
+      setSelectedMonth(String(new Date().getMonth()));
       setStartDate(today);
       const defaultAccount = accounts.find(a => a.is_default) || accounts[0];
       if (defaultAccount) setSelectedAccount(defaultAccount.id);
@@ -96,7 +115,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
 
     // Validation
     if (!description.trim()) {
-      setError(t('Description requise', 'Description required'));
+      setError(t('Bénéficiaire requis', 'Beneficiary required'));
       return;
     }
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
@@ -110,6 +129,15 @@ export default function RecurringForm({ template, onClose, onSave }) {
 
     setSaving(true);
 
+    // Construct start_date for yearly/trimestrial based on selected month
+    let computedStartDate = startDate || null;
+    if (frequency === 'yearly' || frequency === 'trimestrial') {
+      const year = new Date().getFullYear();
+      const month = parseInt(selectedMonth);
+      const day = Math.min(parseInt(dayOfMonth) || 1, new Date(year, month + 1, 0).getDate());
+      computedStartDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
     const data = {
       description: description.trim(),
       amount: parseFloat(amount),
@@ -118,7 +146,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
       day_of_week: frequency === 'weekly' || frequency === 'biweekly' ? parseInt(dayOfWeek) : null,
       subcategory_id: selectedSubcategory,
       account_id: selectedAccount || null,
-      start_date: startDate || null,
+      start_date: computedStartDate,
       end_date: endDate || null,
       notes: notes.trim() || null,
       is_active: isActive,
@@ -226,6 +254,41 @@ export default function RecurringForm({ template, onClose, onSave }) {
             </div>
           )}
 
+          {/* Month selector for yearly */}
+          {frequency === 'yearly' && (
+            <div style={styles.field}>
+              <label style={styles.label}>{t('Mois', 'Month')}</label>
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                style={styles.select}
+              >
+                {monthNames.map((month, idx) => (
+                  <option key={idx} value={idx}>{month}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Month selector for trimestrial (starting month) */}
+          {frequency === 'trimestrial' && (
+            <div style={styles.field}>
+              <label style={styles.label}>{t('Mois de départ', 'Starting month')}</label>
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                style={styles.select}
+              >
+                {monthNames.map((month, idx) => (
+                  <option key={idx} value={idx}>{month}</option>
+                ))}
+              </select>
+              <p style={styles.hint}>
+                {t('Sera facturé en:', 'Will be billed in:')} {trimestrialMonths.join(', ')}
+              </p>
+            </div>
+          )}
+
           {/* Day of week (for weekly/biweekly) */}
           {(frequency === 'weekly' || frequency === 'biweekly') && (
             <div style={styles.field}>
@@ -291,19 +354,34 @@ export default function RecurringForm({ template, onClose, onSave }) {
             </select>
           </div>
 
-          {/* Date range */}
-          <div style={styles.row}>
-            <div style={{ ...styles.field, flex: 1 }}>
-              <label style={styles.label}>{t('Début', 'Start')}</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                style={styles.input}
-              />
+          {/* Date range - show start date only for monthly/weekly */}
+          {(frequency === 'monthly' || frequency === 'weekly' || frequency === 'biweekly') && (
+            <div style={styles.row}>
+              <div style={{ ...styles.field, flex: 1 }}>
+                <label style={styles.label}>{t('Début', 'Start')}</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  style={styles.input}
+                />
+              </div>
+              <div style={{ ...styles.field, flex: 1 }}>
+                <label style={styles.label}>{t('Fin (optionnel)', 'End (optional)')}</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  style={styles.input}
+                />
+              </div>
             </div>
-            <div style={{ ...styles.field, flex: 1 }}>
-              <label style={styles.label}>{t('Fin (optionnel)', 'End (optional)')}</label>
+          )}
+
+          {/* Only end date for yearly/trimestrial */}
+          {(frequency === 'yearly' || frequency === 'trimestrial') && (
+            <div style={styles.field}>
+              <label style={styles.label}>{t('Date de fin (optionnel)', 'End date (optional)')}</label>
               <input
                 type="date"
                 value={endDate}
@@ -311,7 +389,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
                 style={styles.input}
               />
             </div>
-          </div>
+          )}
 
           {/* Description (was Notes) */}
           <div style={styles.field}>
@@ -439,6 +517,12 @@ const styles = {
     outline: 'none',
     backgroundColor: 'white',
     cursor: 'pointer',
+  },
+  hint: {
+    fontSize: '12px',
+    color: '#636E72',
+    marginTop: '6px',
+    fontStyle: 'italic',
   },
   checkboxField: {
     display: 'flex',
