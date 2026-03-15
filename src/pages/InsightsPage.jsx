@@ -24,22 +24,35 @@ export default function InsightsPage() {
   } = useApp();
   
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
   
   // ============================================================================
   // STATE
   // ============================================================================
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [activeTab, setActiveTab] = useState('overview');
   const [showSettings, setShowSettings] = useState(false);
   
   // Settings/Options
+  const [viewMode, setViewMode] = useState('yearly'); // 'yearly' or 'monthly'
   const [yearsToCompare, setYearsToCompare] = useState(2); // 1-5 years
+  const [monthsToCompare, setMonthsToCompare] = useState(3); // 1-12 months
   const [selectedAccount, setSelectedAccount] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showMonthlyChart, setShowMonthlyChart] = useState(true);
   const [showCategoryTrends, setShowCategoryTrends] = useState(true);
   const [showKPIs, setShowKPIs] = useState(true);
   const [chartType, setChartType] = useState('bar'); // 'bar' or 'line'
+
+  // Month names
+  const monthNames = language === 'fr'
+    ? ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+    : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const monthNamesShort = language === 'fr'
+    ? ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   // ============================================================================
   // AVAILABLE YEARS
@@ -52,6 +65,20 @@ export default function InsightsPage() {
     });
     return Array.from(years).sort((a, b) => b - a);
   }, [transactions]);
+
+  // ============================================================================
+  // AVAILABLE MONTHS (for selected year)
+  // ============================================================================
+  const availableMonths = useMemo(() => {
+    const months = new Set();
+    transactions.forEach(tx => {
+      const d = new Date(tx.date);
+      if (d.getFullYear() === selectedYear) {
+        months.add(d.getMonth());
+      }
+    });
+    return Array.from(months).sort((a, b) => a - b);
+  }, [transactions, selectedYear]);
 
   // ============================================================================
   // FILTERED TRANSACTIONS
@@ -88,68 +115,148 @@ export default function InsightsPage() {
     return result;
   }, [filteredTransactions, selectedYear, yearsToCompare]);
 
-  // Current year transactions (for category breakdowns etc)
-  const yearTransactions = transactionsByYear[selectedYear] || [];
+  // ============================================================================
+  // TRANSACTIONS BY MONTH (for monthly view comparison)
+  // ============================================================================
+  const transactionsByMonth = useMemo(() => {
+    const result = {};
+    for (let i = 0; i < monthsToCompare; i++) {
+      // Calculate month/year going backwards
+      let targetMonth = selectedMonth - i;
+      let targetYear = selectedYear;
+      while (targetMonth < 0) {
+        targetMonth += 12;
+        targetYear -= 1;
+      }
+      
+      const key = `${targetYear}-${targetMonth}`;
+      result[key] = filteredTransactions.filter(tx => {
+        const d = new Date(tx.date);
+        return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+      });
+    }
+    return result;
+  }, [filteredTransactions, selectedYear, selectedMonth, monthsToCompare]);
+
+  // Current period transactions (for category breakdowns etc)
+  const currentPeriodTransactions = useMemo(() => {
+    if (viewMode === 'monthly') {
+      const key = `${selectedYear}-${selectedMonth}`;
+      return transactionsByMonth[key] || [];
+    }
+    return transactionsByYear[selectedYear] || [];
+  }, [viewMode, transactionsByYear, transactionsByMonth, selectedYear, selectedMonth]);
+
+  // Legacy alias for compatibility
+  const yearTransactions = currentPeriodTransactions;
 
   // ============================================================================
   // KPI CALCULATIONS
   // ============================================================================
   const kpiData = useMemo(() => {
-    const years = Object.keys(transactionsByYear).map(Number).sort((a, b) => b - a);
-    const currentYearTx = transactionsByYear[years[0]] || [];
-    const prevYearTx = transactionsByYear[years[1]] || [];
-    
-    const currentTotal = currentYearTx.reduce((sum, tx) => sum + tx.amount, 0);
-    const prevTotal = prevYearTx.reduce((sum, tx) => sum + tx.amount, 0);
-    const yearDiff = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
-    
-    // Current month stats
-    const now = new Date();
-    const currentMonthTx = currentYearTx.filter(tx => {
-      const d = new Date(tx.date);
-      return d.getMonth() === now.getMonth();
-    });
-    const currentMonthTotal = currentMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
-    
-    // Average monthly (only count months with data)
-    const monthsWithData = new Set(currentYearTx.map(tx => new Date(tx.date).getMonth())).size;
-    const avgMonthly = monthsWithData > 0 ? currentTotal / monthsWithData : 0;
-
-    return {
-      yearTotal: currentTotal,
-      yearDiff,
-      avgMonthly,
-      txCount: currentYearTx.length,
-      currentMonthTotal,
-      currentMonthTxCount: currentMonthTx.length,
-    };
-  }, [transactionsByYear]);
-
-  // ============================================================================
-  // MONTHLY DATA (multi-year)
-  // ============================================================================
-  const monthlyData = useMemo(() => {
-    const monthNames = language === 'fr'
-      ? ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    const years = Object.keys(transactionsByYear).map(Number).sort((a, b) => b - a);
-
-    const data = monthNames.map((name, monthIndex) => {
-      const point = { name };
+    if (viewMode === 'monthly') {
+      // Monthly view KPIs
+      const keys = Object.keys(transactionsByMonth).sort((a, b) => b.localeCompare(a));
+      const currentMonthTx = transactionsByMonth[keys[0]] || [];
+      const prevMonthTx = transactionsByMonth[keys[1]] || [];
       
-      years.forEach(year => {
-        const monthTotal = (transactionsByYear[year] || [])
-          .filter(tx => new Date(tx.date).getMonth() === monthIndex)
-          .reduce((sum, tx) => sum + tx.amount, 0);
-        point[year] = Math.round(monthTotal);
+      const currentTotal = currentMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
+      const prevTotal = prevMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
+      const periodDiff = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
+      
+      // Average per day
+      const daysWithData = new Set(currentMonthTx.map(tx => new Date(tx.date).getDate())).size;
+      const avgDaily = daysWithData > 0 ? currentTotal / daysWithData : 0;
+
+      return {
+        periodTotal: currentTotal,
+        periodDiff,
+        avgPeriod: avgDaily,
+        avgLabel: 'day',
+        txCount: currentMonthTx.length,
+        comparisonLabel: keys[1] ? `${monthNamesShort[parseInt(keys[1].split('-')[1])]} ${keys[1].split('-')[0]}` : '',
+      };
+    } else {
+      // Yearly view KPIs
+      const years = Object.keys(transactionsByYear).map(Number).sort((a, b) => b - a);
+      const currentYearTx = transactionsByYear[years[0]] || [];
+      const prevYearTx = transactionsByYear[years[1]] || [];
+      
+      const currentTotal = currentYearTx.reduce((sum, tx) => sum + tx.amount, 0);
+      const prevTotal = prevYearTx.reduce((sum, tx) => sum + tx.amount, 0);
+      const periodDiff = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
+      
+      // Average monthly (only count months with data)
+      const monthsWithData = new Set(currentYearTx.map(tx => new Date(tx.date).getMonth())).size;
+      const avgMonthly = monthsWithData > 0 ? currentTotal / monthsWithData : 0;
+
+      return {
+        periodTotal: currentTotal,
+        periodDiff,
+        avgPeriod: avgMonthly,
+        avgLabel: 'month',
+        txCount: currentYearTx.length,
+        comparisonLabel: years[1] ? String(years[1]) : '',
+      };
+    }
+  }, [viewMode, transactionsByYear, transactionsByMonth, monthNamesShort]);
+
+  // ============================================================================
+  // COMPARISON CHART DATA (yearly: months, monthly: days)
+  // ============================================================================
+  const comparisonChartData = useMemo(() => {
+    if (viewMode === 'monthly') {
+      // Daily comparison for multiple months
+      const keys = Object.keys(transactionsByMonth).sort((a, b) => b.localeCompare(a));
+      
+      // Get max days (use 31 for consistency)
+      const data = Array.from({ length: 31 }, (_, i) => {
+        const day = i + 1;
+        const point = { name: String(day) };
+        
+        keys.forEach(key => {
+          const [year, month] = key.split('-').map(Number);
+          const dayTotal = (transactionsByMonth[key] || [])
+            .filter(tx => new Date(tx.date).getDate() === day)
+            .reduce((sum, tx) => sum + tx.amount, 0);
+          point[`${monthNamesShort[month]} ${year}`] = Math.round(dayTotal);
+        });
+
+        return point;
       });
 
-      return point;
-    });
+      const labels = keys.map(key => {
+        const [year, month] = key.split('-').map(Number);
+        return `${monthNamesShort[month]} ${year}`;
+      });
 
-    return { data, years };
-  }, [transactionsByYear, language]);
+      return { data, labels };
+    } else {
+      // Monthly comparison for multiple years
+      const years = Object.keys(transactionsByYear).map(Number).sort((a, b) => b - a);
+
+      const data = monthNamesShort.map((name, monthIndex) => {
+        const point = { name };
+        
+        years.forEach(year => {
+          const monthTotal = (transactionsByYear[year] || [])
+            .filter(tx => new Date(tx.date).getMonth() === monthIndex)
+            .reduce((sum, tx) => sum + tx.amount, 0);
+          point[year] = Math.round(monthTotal);
+        });
+
+        return point;
+      });
+
+      return { data, labels: years.map(String) };
+    }
+  }, [viewMode, transactionsByYear, transactionsByMonth, monthNamesShort]);
+
+  // Legacy alias
+  const monthlyData = { 
+    data: comparisonChartData.data, 
+    years: comparisonChartData.labels 
+  };
 
   // ============================================================================
   // CATEGORY BREAKDOWN
@@ -280,24 +387,69 @@ export default function InsightsPage() {
         <div style={styles.settingsPanel}>
           <h3 style={styles.settingsTitle}>{t('Options', 'Options')}</h3>
           
-          {/* Years to compare */}
+          {/* View mode toggle */}
           <div style={styles.settingRow}>
-            <span style={styles.settingLabel}>{t('Années à comparer', 'Years to compare')}</span>
+            <span style={styles.settingLabel}>{t('Mode de vue', 'View mode')}</span>
             <div style={styles.chipGroup}>
-              {[1, 2, 3, 4, 5].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setYearsToCompare(n)}
-                  style={{
-                    ...styles.chip,
-                    ...(yearsToCompare === n ? styles.chipActive : {}),
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
+              <button
+                onClick={() => setViewMode('yearly')}
+                style={{
+                  ...styles.chip,
+                  ...(viewMode === 'yearly' ? styles.chipActive : {}),
+                }}
+              >
+                📅 {t('Annuel', 'Yearly')}
+              </button>
+              <button
+                onClick={() => setViewMode('monthly')}
+                style={{
+                  ...styles.chip,
+                  ...(viewMode === 'monthly' ? styles.chipActive : {}),
+                }}
+              >
+                📆 {t('Mensuel', 'Monthly')}
+              </button>
             </div>
           </div>
+
+          {/* Years/Months to compare */}
+          {viewMode === 'yearly' ? (
+            <div style={styles.settingRow}>
+              <span style={styles.settingLabel}>{t('Années à comparer', 'Years to compare')}</span>
+              <div style={styles.chipGroup}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setYearsToCompare(n)}
+                    style={{
+                      ...styles.chip,
+                      ...(yearsToCompare === n ? styles.chipActive : {}),
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={styles.settingRow}>
+              <span style={styles.settingLabel}>{t('Mois à comparer', 'Months to compare')}</span>
+              <div style={styles.chipGroup}>
+                {[1, 2, 3, 6, 12].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setMonthsToCompare(n)}
+                    style={{
+                      ...styles.chip,
+                      ...(monthsToCompare === n ? styles.chipActive : {}),
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Chart type */}
           <div style={styles.settingRow}>
@@ -409,26 +561,66 @@ export default function InsightsPage() {
         </div>
       )}
 
-      {/* Year selector */}
-      <div style={styles.yearSelector}>
-        <button 
-          onClick={() => setSelectedYear(y => y - 1)} 
-          style={styles.yearBtn}
-          disabled={!availableYears.includes(selectedYear - 1)}
-        >
-          ◀
-        </button>
-        <span style={styles.yearText}>{selectedYear}</span>
-        <button 
-          onClick={() => setSelectedYear(y => y + 1)} 
-          style={{
-            ...styles.yearBtn,
-            opacity: selectedYear >= currentYear ? 0.3 : 1
-          }}
-          disabled={selectedYear >= currentYear}
-        >
-          ▶
-        </button>
+      {/* Period selector */}
+      <div style={styles.periodSelector}>
+        {/* Year selector */}
+        <div style={styles.yearSelector}>
+          <button 
+            onClick={() => setSelectedYear(y => y - 1)} 
+            style={styles.yearBtn}
+            disabled={!availableYears.includes(selectedYear - 1)}
+          >
+            ◀
+          </button>
+          <span style={styles.yearText}>{selectedYear}</span>
+          <button 
+            onClick={() => setSelectedYear(y => y + 1)} 
+            style={{
+              ...styles.yearBtn,
+              opacity: selectedYear >= currentYear ? 0.3 : 1
+            }}
+            disabled={selectedYear >= currentYear}
+          >
+            ▶
+          </button>
+        </div>
+
+        {/* Month selector (only in monthly mode) */}
+        {viewMode === 'monthly' && (
+          <div style={styles.monthSelector}>
+            <button 
+              onClick={() => {
+                if (selectedMonth === 0) {
+                  setSelectedMonth(11);
+                  setSelectedYear(y => y - 1);
+                } else {
+                  setSelectedMonth(m => m - 1);
+                }
+              }} 
+              style={styles.monthBtn}
+            >
+              ◀
+            </button>
+            <span style={styles.monthText}>{monthNames[selectedMonth]}</span>
+            <button 
+              onClick={() => {
+                if (selectedMonth === 11) {
+                  setSelectedMonth(0);
+                  setSelectedYear(y => y + 1);
+                } else {
+                  setSelectedMonth(m => m + 1);
+                }
+              }} 
+              style={{
+                ...styles.monthBtn,
+                opacity: (selectedYear >= currentYear && selectedMonth >= currentMonth) ? 0.3 : 1
+              }}
+              disabled={selectedYear >= currentYear && selectedMonth >= currentMonth}
+            >
+              ▶
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tab selector */}
@@ -471,21 +663,25 @@ export default function InsightsPage() {
               <div style={styles.kpiCard}>
                 <span style={styles.kpiIcon}>💰</span>
                 <div>
-                  <span style={styles.kpiLabel}>{t('Total', 'Total')} {selectedYear}</span>
-                  <span style={styles.kpiValue}>{formatAmount(kpiData.yearTotal)}</span>
+                  <span style={styles.kpiLabel}>
+                    {t('Total', 'Total')} {viewMode === 'monthly' ? monthNames[selectedMonth] : selectedYear}
+                  </span>
+                  <span style={styles.kpiValue}>{formatAmount(kpiData.periodTotal)}</span>
                 </div>
               </div>
               
               <div style={styles.kpiCard}>
-                <span style={styles.kpiIcon}>{kpiData.yearDiff <= 0 ? '📉' : '📈'}</span>
+                <span style={styles.kpiIcon}>{kpiData.periodDiff <= 0 ? '📉' : '📈'}</span>
                 <div>
-                  <span style={styles.kpiLabel}>vs {selectedYear - 1}</span>
+                  <span style={styles.kpiLabel}>
+                    vs {kpiData.comparisonLabel || (viewMode === 'monthly' ? t('mois préc.', 'prev month') : selectedYear - 1)}
+                  </span>
                   <span style={{
                     ...styles.kpiValue,
-                    color: kpiData.yearDiff <= 0 ? '#00B894' : '#E74C3C',
+                    color: kpiData.periodDiff <= 0 ? '#00B894' : '#E74C3C',
                     fontSize: '16px',
                   }}>
-                    {kpiData.yearDiff > 0 ? '+' : ''}{kpiData.yearDiff.toFixed(0)}%
+                    {kpiData.periodDiff > 0 ? '+' : ''}{kpiData.periodDiff.toFixed(0)}%
                   </span>
                 </div>
               </div>
@@ -493,8 +689,13 @@ export default function InsightsPage() {
               <div style={styles.kpiCard}>
                 <span style={styles.kpiIcon}>📅</span>
                 <div>
-                  <span style={styles.kpiLabel}>{t('Moyenne/mois', 'Avg/month')}</span>
-                  <span style={styles.kpiValue}>{formatAmount(kpiData.avgMonthly)}</span>
+                  <span style={styles.kpiLabel}>
+                    {kpiData.avgLabel === 'day' 
+                      ? t('Moyenne/jour', 'Avg/day')
+                      : t('Moyenne/mois', 'Avg/month')
+                    }
+                  </span>
+                  <span style={styles.kpiValue}>{formatAmount(kpiData.avgPeriod)}</span>
                 </div>
               </div>
 
@@ -508,67 +709,70 @@ export default function InsightsPage() {
             </div>
           )}
 
-          {/* Monthly comparison chart (multi-year) */}
+          {/* Comparison chart */}
           {showMonthlyChart && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle}>
-                📊 {t('Comparaison mensuelle', 'Monthly comparison')} 
+                📊 {viewMode === 'monthly' 
+                  ? t('Comparaison journalière', 'Daily comparison')
+                  : t('Comparaison mensuelle', 'Monthly comparison')
+                }
                 <span style={styles.sectionSubtitle}>
-                  ({yearsToCompare} {t('ans', 'years')})
+                  ({viewMode === 'monthly' ? monthsToCompare : yearsToCompare} {viewMode === 'monthly' ? t('mois', 'months') : t('ans', 'years')})
                 </span>
               </h2>
               <div style={styles.chartCard}>
-                {yearTransactions.length === 0 ? (
+                {currentPeriodTransactions.length === 0 ? (
                   <p style={styles.emptyText}>{t('Aucune donnée', 'No data')}</p>
                 ) : (
                   <>
                     <ResponsiveContainer width="100%" height={220}>
                       {chartType === 'bar' ? (
-                        <BarChart data={monthlyData.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <BarChart data={comparisonChartData.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <XAxis dataKey="name" tick={{ fontSize: viewMode === 'monthly' ? 9 : 11 }} interval={viewMode === 'monthly' ? 2 : 0} />
                           <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
                           <Tooltip 
                             formatter={(value) => formatAmount(value)}
                             contentStyle={{ fontSize: '12px' }}
                           />
-                          {monthlyData.years.map((year, index) => (
+                          {comparisonChartData.labels.map((label, index) => (
                             <Bar 
-                              key={year} 
-                              dataKey={year} 
+                              key={label} 
+                              dataKey={label} 
                               fill={YEAR_COLORS[index] || COLORS[index % COLORS.length]}
                               radius={[2, 2, 0, 0]}
                             />
                           ))}
                         </BarChart>
                       ) : (
-                        <LineChart data={monthlyData.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <LineChart data={comparisonChartData.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <XAxis dataKey="name" tick={{ fontSize: viewMode === 'monthly' ? 9 : 11 }} interval={viewMode === 'monthly' ? 2 : 0} />
                           <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
                           <Tooltip 
                             formatter={(value) => formatAmount(value)}
                             contentStyle={{ fontSize: '12px' }}
                           />
-                          {monthlyData.years.map((year, index) => (
+                          {comparisonChartData.labels.map((label, index) => (
                             <Line 
-                              key={year} 
+                              key={label} 
                               type="monotone"
-                              dataKey={year} 
+                              dataKey={label} 
                               stroke={YEAR_COLORS[index] || COLORS[index % COLORS.length]}
                               strokeWidth={2}
-                              dot={{ r: 3 }}
+                              dot={{ r: viewMode === 'monthly' ? 2 : 3 }}
                             />
                           ))}
                         </LineChart>
                       )}
                     </ResponsiveContainer>
                     <div style={styles.legend}>
-                      {monthlyData.years.map((year, index) => (
-                        <span key={year} style={styles.legendItem}>
+                      {comparisonChartData.labels.map((label, index) => (
+                        <span key={label} style={styles.legendItem}>
                           <span style={{
                             ...styles.legendDot,
                             backgroundColor: YEAR_COLORS[index] || COLORS[index % COLORS.length],
                           }} />
-                          {year}
+                          {label}
                         </span>
                       ))}
                     </div>
@@ -866,12 +1070,18 @@ const styles = {
     padding: '0 2px',
     fontSize: '12px',
   },
+  periodSelector: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '16px',
+  },
   yearSelector: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '16px',
-    marginBottom: '16px',
   },
   yearBtn: {
     width: '36px',
@@ -890,6 +1100,32 @@ const styles = {
     fontSize: '20px',
     fontWeight: '700',
     color: '#2D3436',
+  },
+  monthSelector: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+  },
+  monthBtn: {
+    width: '32px',
+    height: '32px',
+    border: '1px solid #E1E8ED',
+    borderRadius: '8px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    fontSize: '12px',
+    color: '#2D3436',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthText: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#00A3E0',
+    minWidth: '100px',
+    textAlign: 'center',
   },
   tabs: {
     display: 'flex',
