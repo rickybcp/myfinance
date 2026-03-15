@@ -23,9 +23,20 @@ export default function RecurringPage() {
   // HELPER: Generate occurrence dates for a template
   // ============================================================================
   
+  // Helper to parse "YYYY-MM-DD" as local date (not UTC)
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const generateOccurrences = (template, startFrom, endDate) => {
     const occurrences = [];
     let current = new Date(startFrom.getFullYear(), startFrom.getMonth(), 1);
+
+    // Get start month for trimestrial/yearly (parse safely)
+    const templateStartDate = parseLocalDate(template.start_date);
+    const templateStartMonth = templateStartDate ? templateStartDate.getMonth() : 0;
 
     while (current <= endDate) {
       const year = current.getFullYear();
@@ -38,8 +49,7 @@ export default function RecurringPage() {
           : Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
         expectedDate = new Date(year, month, day);
       } else if (template.frequency === 'trimestrial') {
-        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
-        const monthsDiff = (month - startMonth + 12) % 12;
+        const monthsDiff = (month - templateStartMonth + 12) % 12;
         if (monthsDiff % 3 === 0) {
           const day = template.day_of_month === 99
             ? new Date(year, month + 1, 0).getDate()
@@ -47,8 +57,7 @@ export default function RecurringPage() {
           expectedDate = new Date(year, month, day);
         }
       } else if (template.frequency === 'yearly') {
-        const startMonth = template.start_date ? new Date(template.start_date).getMonth() : 0;
-        if (month === startMonth) {
+        if (month === templateStartMonth) {
           const day = Math.min(template.day_of_month || 1, new Date(year, month + 1, 0).getDate());
           expectedDate = new Date(year, month, day);
         }
@@ -79,17 +88,19 @@ export default function RecurringPage() {
       if (!template.is_active) return;
 
       // Start from start_date or last_skipped_date (whichever is later)
-      let startFrom = template.start_date ? new Date(template.start_date) : new Date(2020, 0, 1);
+      let startFrom = parseLocalDate(template.start_date) || new Date(2020, 0, 1);
+      
       if (template.last_skipped_date) {
-        const skippedDate = new Date(template.last_skipped_date);
-        if (skippedDate > startFrom) {
+        const skippedDate = parseLocalDate(template.last_skipped_date);
+        if (skippedDate && skippedDate >= startFrom) {
           // Start from month AFTER the skipped date
           startFrom = new Date(skippedDate.getFullYear(), skippedDate.getMonth() + 1, 1);
         }
       }
 
       // Check if end date has passed
-      if (template.end_date && new Date(template.end_date) < today) return;
+      const endDate = parseLocalDate(template.end_date);
+      if (endDate && endDate < today) return;
 
       // Generate all expected occurrences from startFrom to end of current month
       const occurrences = generateOccurrences(template, startFrom, endOfMonth);
