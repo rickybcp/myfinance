@@ -96,21 +96,35 @@ export default function RecurringPage() {
 
       // Filter out occurrences that have matching transactions
       occurrences.forEach(expectedDate => {
+        const expectedMonth = expectedDate.getMonth();
+        const expectedYear = expectedDate.getFullYear();
+        
         const exists = transactions.some(tx => {
-          const txDate = new Date(tx.date);
+          // Parse date string as local date to avoid timezone issues
+          // tx.date is "YYYY-MM-DD" format
+          const [year, month] = tx.date.split('-').map(Number);
+          const txMonth = month - 1; // JS months are 0-indexed
+          const txYear = year;
+          
           return (
             tx.description === template.description &&
             Math.abs(tx.amount - template.amount) < 0.01 &&
-            txDate.getMonth() === expectedDate.getMonth() &&
-            txDate.getFullYear() === expectedDate.getFullYear()
+            txMonth === expectedMonth &&
+            txYear === expectedYear
           );
         });
 
         if (!exists) {
+          // Format date as YYYY-MM-DD in local time (not UTC)
+          const y = expectedDate.getFullYear();
+          const m = String(expectedDate.getMonth() + 1).padStart(2, '0');
+          const d = String(expectedDate.getDate()).padStart(2, '0');
+          const dateStr = `${y}-${m}-${d}`;
+          
           pending.push({
             ...template,
-            expectedDate: expectedDate.toISOString().split('T')[0],
-            _occurrenceKey: `${template.id}-${expectedDate.toISOString().split('T')[0]}`,
+            expectedDate: dateStr,
+            _occurrenceKey: `${template.id}-${dateStr}`,
           });
         }
       });
